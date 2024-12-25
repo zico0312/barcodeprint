@@ -8,6 +8,7 @@ import tkinter as tk
 import sqlite3
 import tkinter.simpledialog as ts
 import tkinter.messagebox as tm
+import socket
 
 class MainPage(tk.Tk):
     def __init__(self):
@@ -106,6 +107,8 @@ class MainPage(tk.Tk):
     def focus_next_widget(self,event):
         event.widget.tk_focusNext().focus()
         return "break"
+    
+    
 
     def print_label(self):
         startnum=self.startnumberinput.get()
@@ -117,21 +120,20 @@ class MainPage(tk.Tk):
             tm.showerror("エラー","終了番号が不正な値です",parent=self)
             return
         
-        barcode_number="A001A"
-        ean = barcode.get('nw-7', barcode_number, writer=ImageWriter())
-        buffer = BytesIO()
-        ean.write(buffer, {'write_text': True})  # 'write_text': False によりテキストを含めない
+        # barcode_number="A001A"
+        # ean = barcode.get('nw-7', barcode_number, writer=ImageWriter())
+        # buffer = BytesIO()
+        # ean.write(buffer, {'write_text': True})  # 'write_text': False によりテキストを含めない
 
-        # バッファの内容をPIL Imageに変換
-        buffer.seek(0)
-        image = Image.open(buffer).convert("1")
-        image_data = image.tobytes()
+        # # バッファの内容をPIL Imageに変換
+        # buffer.seek(0)
+        # image = Image.open(buffer).convert("1")
+        # image_data = image.tobytes()
         
         if not self.ipaddress or not self.port or not self.dpi:
             tm.showerror("エラー","プリンタが未設定です")
             return
         label_width=int(90*self.dpi/25.4)
-        label_height=image.size[1]
         comm = SG412R_Status5()
         
         
@@ -145,13 +147,15 @@ class MainPage(tk.Tk):
                 with gen.packet_for_with():
                     with gen.page_for_with():
                         
-                        gen.expansion((2,2))
+                        gen.expansion((2, 2))
 
-                        gen.pos((10, 10))
-                        gen.image(image_data)
+                        gen.pos((10,10))
+                        gen.code_128(text="A001A",pitch=2,height=100)
                         
+                        gen.pos((10,130))
+                        gen.write_text("A001A")
 
-                        gen.set_label_size((label_width,label_height))
+                        # gen.set_label_size((label_width,60))
                         gen.print()  # 印刷命令
 
                 # 印刷用のメインパケットを送信
