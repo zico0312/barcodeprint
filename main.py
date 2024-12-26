@@ -1,4 +1,3 @@
-import time
 from sbpl import SG412R_Status5, LabelGenerator
 import tkinter as tk
 import sqlite3
