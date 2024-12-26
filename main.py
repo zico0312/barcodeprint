@@ -10,6 +10,7 @@ class MainPage(tk.Tk):
     def __init__(self):
         super().__init__()
         self.connection=None
+        self.gen=None
         self.loading=True
         self.screen_width =self.winfo_screenwidth()
         self.screen_height=self.winfo_screenheight()
@@ -43,24 +44,26 @@ class MainPage(tk.Tk):
         
         frame=tk.Frame(self)
         frame.pack(side=tk.TOP,padx=4,pady=12,fill=tk.X)
-        tk.Label(frame,text="開始番号",font=("",12,"")).pack(side=tk.LEFT)
-        self.startnumberinput=tk.Entry(frame,font=("",12,""),justify=tk.CENTER)
-        self.startnumberinput.pack(side=tk.LEFT)
+        min_frame=tk.Frame(frame)
+        min_frame.pack(side=tk.TOP,padx=4,pady=12)
+        tk.Label(min_frame,text="番号",font=("",12,"")).pack(side=tk.TOP)
+        self.startnumberinput=tk.Entry(min_frame,font=("",12,""),justify=tk.CENTER)
+        self.startnumberinput.pack(side=tk.TOP)
         self.startnumberinput.bind("<Return>",self.focus_next_widget)
         
-        
-        frame=tk.Frame(self)
-        frame.pack(side=tk.TOP,padx=4,pady=12,fill=tk.X)
-        tk.Label(frame,text="終了番号",font=("",12,"")).pack(side=tk.LEFT)
-        self.endnumberinput=tk.Entry(frame,font=("",12,""),justify=tk.CENTER)
-        self.endnumberinput.pack(side=tk.LEFT)
+        self.startnumberinput.focus_force()
         
         frame=tk.Frame(self)
         frame.pack(side=tk.TOP,padx=4,pady=12,fill=tk.X)
         tk.Button(frame,text="印字",font=("",12,""),command=self.print_label).pack(side=tk.TOP,anchor=tk.S)
 
         self.comm= SG412R_Status5()
-        self.connection=self.comm.open(self.ipaddress, self.port)
+        try:
+            self.connection=self.comm.open(self.ipaddress, self.port)
+            self.gen=LabelGenerator()
+        
+        except Exception as e:
+            print(e)
 
         self.loading=False
     
@@ -135,29 +138,26 @@ class MainPage(tk.Tk):
             print("接続なし")
             return
         
+        if not self.gen:
+            print("gen接続なし")
+            return
+        
         try:
-            # ソケットをオープン
-            
-            time.sleep(1)
-            # ラベル生成
-            gen = LabelGenerator()
-            
-            with gen.packet_for_with():
-                for num in range(int(startnum),int(endnum)+1):
-                    time.sleep(1)
-                    num_str=f"{num:03}"
-                    print(num_str)
-                    with gen.page_for_with():
-                        gen.expansion((2, 2))
-                        gen.pos((10,10))
-                        gen.code_39(text=num_str,pitch=2,height=100)
-                        gen.pos((10,130))
-                        gen.write_text(num_str)
-                        gen.print()
-                        self.comm.send(gen.to_bytes())
-                        cut_command = b'^XA^MMC^XZ'  # カットコマンド
-                        self.comm.send(cut_command)
-                    
+                
+            with self.gen.packet_for_with():
+                num_str=f"{startnum:03}"
+                print(num_str)
+                with self.gen.page_for_with():
+                    self.gen.expansion((2, 2))
+                    self.gen.pos((10,10))
+                    self.gen.code_39(text=num_str,pitch=2,height=100)
+                    self.gen.pos((10,130))
+                    self.gen.write_text(num_str)
+                    self.gen.print()
+                    self.comm.send(self.gen.to_bytes())
+                    cut_command = b'^XA^MMC^XZ'  # カットコマンド
+                    self.comm.send(cut_command)
+                
     
             # 最終化パケットの送信
             print("処理完了")
