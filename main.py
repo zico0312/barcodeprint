@@ -1,19 +1,15 @@
 import time
-import barcode
-from barcode.writer import ImageWriter
-from io import BytesIO
-from PIL import Image
-import sbpl
 from sbpl import SG412R_Status5, LabelGenerator
 import tkinter as tk
 import sqlite3
 import tkinter.simpledialog as ts
 import tkinter.messagebox as tm
-import socket
+
 
 class MainPage(tk.Tk):
     def __init__(self):
         super().__init__()
+        self.connection=None
         self.loading=True
         self.screen_width =self.winfo_screenwidth()
         self.screen_height=self.winfo_screenheight()
@@ -64,6 +60,7 @@ class MainPage(tk.Tk):
         tk.Button(frame,text="印字",font=("",12,""),command=self.print_label).pack(side=tk.TOP,anchor=tk.S)
 
         self.comm= SG412R_Status5()
+        self.connection=self.comm.open(self.ipaddress, self.port)
 
         self.loading=False
     
@@ -134,40 +131,42 @@ class MainPage(tk.Tk):
             return
         label_width=int(90*self.dpi/25.4)
         
-       
+        if not self.connection:
+            print("接続なし")
+            return
         
         try:
             # ソケットをオープン
-            with self.comm.open(self.ipaddress, self.port):
-                time.sleep(1)
-                # ラベル生成
-                gen = LabelGenerator()
-                
-                with gen.packet_for_with():
-                    for num in range(int(startnum),int(endnum)+1):
-                        time.sleep(1)
-                        num_str=f"{num:03}"
-                        print(num_str)
-                        with gen.page_for_with():
-                            gen.expansion((2, 2))
-                            gen.pos((10,10))
-                            gen.code_39(text=num_str,pitch=2,height=100)
-                            gen.pos((10,130))
-                            gen.write_text(num_str)
-                            gen.print()
-                            self.comm.send(gen.to_bytes())
-                            cut_command = b'^XA^MMC^XZ'  # カットコマンド
-                            self.comm.send(cut_command)
-                        
-        
-                # 最終化パケットの送信
-                print("処理完了")
+            
+            time.sleep(1)
+            # ラベル生成
+            gen = LabelGenerator()
+            
+            with gen.packet_for_with():
+                for num in range(int(startnum),int(endnum)+1):
+                    time.sleep(1)
+                    num_str=f"{num:03}"
+                    print(num_str)
+                    with gen.page_for_with():
+                        gen.expansion((2, 2))
+                        gen.pos((10,10))
+                        gen.code_39(text=num_str,pitch=2,height=100)
+                        gen.pos((10,130))
+                        gen.write_text(num_str)
+                        gen.print()
+                        self.comm.send(gen.to_bytes())
+                        cut_command = b'^XA^MMC^XZ'  # カットコマンド
+                        self.comm.send(cut_command)
+                    
+    
+            # 最終化パケットの送信
+            print("処理完了")
 
 
         except Exception as e:
             print("エラー:", e)
 
-        print("完了")
+    print("完了")
         
         
         
@@ -175,14 +174,6 @@ if __name__=="__main__":
     mainpage=MainPage()
     mainpage.mainloop()
 
-# barcode_number="A001A"
-# ean = barcode.get('nw-7', barcode_number, writer=ImageWriter())
-# buffer = BytesIO()
-# ean.write(buffer, {'write_text': True})  # 'write_text': False によりテキストを含めない
 
-# # バッファの内容をPIL Imageに変換
-# buffer.seek(0)
-# image = Image.open(buffer)
-# image_bytes = sbpl.image_to_sbpl(image)
 
 
