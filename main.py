@@ -117,16 +117,13 @@ class MainPage(tk.Tk):
 
     def print_label(self):
         if self.loading:
-            print("sajoksoa")
+            print("ローディング中")
             return
         startnum=self.startnumberinput.get()
         if not startnum or not startnum.isnumeric():
-            tm.showerror("エラー","開始番号が不正な値です",parent=self)
+            tm.showerror("エラー","番号が不正な値です",parent=self)
             return
-        endnum=self.endnumberinput.get()
-        if not endnum or not endnum.isnumeric():
-            tm.showerror("エラー","終了番号が不正な値です",parent=self)
-            return
+        
         
         if not self.ipaddress or not self.port or not self.dpi:
             tm.showerror("エラー","プリンタが未設定です")
