@@ -8,9 +8,9 @@ import tkinter.messagebox as tm
 class MainPage(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.connection=None
-        self.gen=None
-        self.loading=True
+        self.connection = None
+        self.gen = None
+        self.loading = True        
         self.screen_width =self.winfo_screenwidth()
         self.screen_height=self.winfo_screenheight()
         app_width=int(self.screen_width*1/5)
@@ -40,11 +40,16 @@ class MainPage(tk.Tk):
             self.ipaddress:str=data[-1][0]
             self.port:int=data[-1][1]
             self.dpi:int=data[-1][2]
-        
+         
         frame=tk.Frame(self)
-        frame.pack(side=tk.TOP,padx=4,pady=12,fill=tk.X)
+        frame.pack(side=tk.TOP,padx=4,fill=tk.X)
+        tk.Label(frame,text="プリンタ状態:").pack(side=tk.LEFT)
+        self.printerstatelabel=tk.Label(frame,text="未接続")
+        self.printerstatelabel.pack(side=tk.LEFT)
+        frame=tk.Frame(self)
+        frame.pack(side=tk.TOP,padx=4,pady=4,fill=tk.X)
         min_frame=tk.Frame(frame)
-        min_frame.pack(side=tk.TOP,padx=4,pady=12)
+        min_frame.pack(side=tk.TOP,padx=4,pady=4)
         tk.Label(min_frame,text="番号",font=("",12,"")).pack(side=tk.TOP)
         self.startnumberinput=tk.Entry(min_frame,font=("",12,""),justify=tk.CENTER)
         self.startnumberinput.pack(side=tk.TOP)
@@ -57,14 +62,18 @@ class MainPage(tk.Tk):
         tk.Button(frame,text="印字",font=("",12,""),command=self.print_label).pack(side=tk.TOP,anchor=tk.S)
 
         self.comm= SG412R_Status5()
+        self.after(100, self.attempt_connection)
+    
+    def attempt_connection(self):
         try:
-            self.connection=self.comm.open(self.ipaddress, self.port)
-            self.gen=LabelGenerator()
-        
+            self.connection = self.comm.open(self.ipaddress, self.port)
+            self.gen = LabelGenerator()
+            self.printerstatelabel.config(text="接続成功")
+            self.loading = False
         except Exception as e:
             print(e)
-
-        self.loading=False
+            self.printerstatelabel.config(text="接続失敗。再試行中...")
+            self.after(2000, self.attempt_connection)  # 2秒後に再試行
     
     def database_init(self):
         self.cursor.execute('''
@@ -116,8 +125,8 @@ class MainPage(tk.Tk):
     
 
     def print_label(self):
-        if self.loading:
-            print("ローディング中")
+        if not self.gen or not self.comm:
+            tm.showerror("エラー","プリンタ接続を確認して下さい。",parent=self)
             return
         startnum=self.startnumberinput.get()
         if not startnum or not startnum.isnumeric():
@@ -129,14 +138,7 @@ class MainPage(tk.Tk):
             tm.showerror("エラー","プリンタが未設定です")
             return
         label_width=int(90*self.dpi/25.4)
-        
-        if not self.connection:
-            print("接続なし")
-            return
-        
-        if not self.gen:
-            print("gen接続なし")
-            return
+    
         
         try:
                 
