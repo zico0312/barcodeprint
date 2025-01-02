@@ -62,18 +62,23 @@ class MainPage(tk.Tk):
         tk.Button(frame,text="印字",font=("",12,""),command=self.print_label).pack(side=tk.TOP,anchor=tk.S)
 
         self.comm= SG412R_Status5()
-        self.after(100, self.attempt_connection)
+        if self.ipaddress and self.port: 
+            self.after(100, self.attempt_connection)
     
     def attempt_connection(self):
         try:
+            self.printerstatelabel.config(text="接続中")
             self.connection = self.comm.open(self.ipaddress, self.port)
             self.gen = LabelGenerator()
+            self.comm.send(b'PING')
+            response = self.comm.recv(1024) 
+            print(response)
             self.printerstatelabel.config(text="接続成功")
             self.loading = False
         except Exception as e:
             print(e)
-            self.printerstatelabel.config(text="接続失敗。再試行中...")
-            self.after(2000, self.attempt_connection)  # 2秒後に再試行
+            self.printerstatelabel.config(text="未接続")
+            # self.after(2000, self.attempt_connection)  # 2秒後に再試行
     
     def database_init(self):
         self.cursor.execute('''
@@ -117,6 +122,7 @@ class MainPage(tk.Tk):
         self.ipaddress=ipaddress
         self.port=port
         self.dpi=dpi
+        self.after(100, self.attempt_connection)
     
     def focus_next_widget(self,event):
         event.widget.tk_focusNext().focus()
