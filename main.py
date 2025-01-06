@@ -8,9 +8,6 @@ import tkinter.messagebox as tm
 class MainPage(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.connection = None
-        self.gen = None
-        self.loading = True        
         self.screen_width =self.winfo_screenwidth()
         self.screen_height=self.winfo_screenheight()
         app_width=int(self.screen_width*1/5)
@@ -43,9 +40,21 @@ class MainPage(tk.Tk):
          
         frame=tk.Frame(self)
         frame.pack(side=tk.TOP,padx=4,fill=tk.X)
-        tk.Label(frame,text="プリンタ状態:").pack(side=tk.LEFT)
-        self.printerstatelabel=tk.Label(frame,text="未接続")
-        self.printerstatelabel.pack(side=tk.LEFT)
+        small_frame=tk.Frame(frame)
+        small_frame.pack(side=tk.TOP,anchor=tk.W)
+        tk.Label(small_frame,text="IPアドレス:").pack(side=tk.LEFT)
+        self.ipaddresslabel=tk.Label(small_frame,text=self.ipaddress)
+        self.ipaddresslabel.pack(side=tk.LEFT)
+        small_frame=tk.Frame(frame)
+        small_frame.pack(side=tk.TOP,anchor=tk.W)
+        tk.Label(small_frame,text="PORT:").pack(side=tk.LEFT,padx=4)
+        self.portlabel=tk.Label(small_frame,text=self.port)
+        self.portlabel.pack(side=tk.LEFT)
+        small_frame=tk.Frame(frame)
+        small_frame.pack(side=tk.TOP,anchor=tk.W)
+        tk.Label(small_frame,text="dpi:").pack(side=tk.LEFT,padx=4)
+        self.dpilabel=tk.Label(small_frame,text=self.dpi)
+        self.dpilabel.pack(side=tk.LEFT)
         frame=tk.Frame(self)
         frame.pack(side=tk.TOP,padx=4,pady=4,fill=tk.X)
         min_frame=tk.Frame(frame)
@@ -62,23 +71,9 @@ class MainPage(tk.Tk):
         tk.Button(frame,text="印字",font=("",12,""),command=self.print_label).pack(side=tk.TOP,anchor=tk.S)
 
         self.comm= SG412R_Status5()
-        if self.ipaddress and self.port: 
-            self.after(100, self.attempt_connection)
+        
     
-    def attempt_connection(self):
-        try:
-            self.printerstatelabel.config(text="接続中")
-            self.connection = self.comm.open(self.ipaddress, self.port)
-            self.gen = LabelGenerator()
-            self.comm.send(b'PING')
-            response = self.comm.recv(1024) 
-            print(response)
-            self.printerstatelabel.config(text="接続成功")
-            self.loading = False
-        except Exception as e:
-            print(e)
-            self.printerstatelabel.config(text="未接続")
-            # self.after(2000, self.attempt_connection)  # 2秒後に再試行
+    
     
     def database_init(self):
         self.cursor.execute('''
@@ -122,7 +117,7 @@ class MainPage(tk.Tk):
         self.ipaddress=ipaddress
         self.port=port
         self.dpi=dpi
-        self.after(100, self.attempt_connection)
+        
     
     def focus_next_widget(self,event):
         event.widget.tk_focusNext().focus()
@@ -131,7 +126,7 @@ class MainPage(tk.Tk):
     
 
     def print_label(self):
-        if not self.gen or not self.comm:
+        if not self.comm:
             tm.showerror("エラー","プリンタ接続を確認して下さい。",parent=self)
             return
         startnum=self.startnumberinput.get()
@@ -147,22 +142,23 @@ class MainPage(tk.Tk):
     
         
         try:
-                
-            with self.gen.packet_for_with():
-                num_str=f"{startnum:03}"
-                print(num_str)
-                with self.gen.page_for_with():
-                    self.gen.expansion((2, 2))
-                    self.gen.pos((10,10))
-                    self.gen.code_39(text=num_str,pitch=2,height=100)
-                    self.gen.pos((10,130))
-                    self.gen.write_text(num_str)
-                    self.gen.print()
-                    self.comm.send(self.gen.to_bytes())
-                    cut_command = b'^XA^MMC^XZ'  # カットコマンド
-                    self.comm.send(cut_command)
-                
-    
+            with self.comm.open(self.ipaddress, self.port):
+                gen=LabelGenerator()
+                with gen.packet_for_with():
+                    num_str=f"{int(startnum):03}"
+                    print(num_str)
+                    with gen.page_for_with():
+                        gen.expansion((2, 2))
+                        gen.pos((10,10))
+                        gen.code_39(text=num_str,pitch=2,height=100)
+                        gen.pos((10,130))
+                        gen.write_text(num_str)
+                        gen.print()
+            self.comm.send(gen.to_bytes())
+            cut_command = b'^XA^MMC^XZ'  # カットコマンド
+            self.comm.send(cut_command)
+        
+        
             # 最終化パケットの送信
             print("処理完了")
 
