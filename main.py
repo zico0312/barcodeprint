@@ -1,8 +1,11 @@
+import time
 from sbpl import SG412R_Status5, LabelGenerator
 import tkinter as tk
 import sqlite3
 import tkinter.simpledialog as ts
 import tkinter.messagebox as tm
+
+
 
 
 class MainPage(tk.Tk):
@@ -143,8 +146,12 @@ class MainPage(tk.Tk):
         
         try:
             with comm.open(self.ipaddress, self.port):
+                time.sleep(1)
                 reset_command = b'^XA^MMT^XZ' 
                 comm.send(reset_command) 
+                comm.send(b'^HS')
+                res=comm._client.recv(1024)
+                print(res)
                 gen=LabelGenerator()
                 comm.send(b'^XA') 
                 with gen.packet_for_with():
@@ -162,11 +169,14 @@ class MainPage(tk.Tk):
                         gen.pos((460,130))
                         gen.write_text(next_num_str)
                         gen.print(num=1)
-                    comm.send(gen.to_bytes())
+                    data=gen.to_bytes()
+                    print(data,"data")
+                    comm.send(data)
                     comm.send(b'^XZ')
                     cut_command = b'^XA^MMC^XZ'  # カットコマンド
                     comm.send(cut_command)
-                    
+                    reset_command = b'^XA^MMT^XZ' 
+                    comm.send(reset_command) 
                 
         
             # 最終化パケットの送信
@@ -177,7 +187,6 @@ class MainPage(tk.Tk):
             print("エラー:", e)
 
         finally:
-            comm.close()
             print("完了")
 
         
