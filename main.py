@@ -70,7 +70,6 @@ class MainPage(tk.Tk):
         frame.pack(side=tk.TOP,padx=4,pady=12,fill=tk.X)
         tk.Button(frame,text="印字",font=("",12,""),command=self.print_label).pack(side=tk.TOP,anchor=tk.S)
 
-        self.comm= SG412R_Status5()
         
     
     
@@ -117,6 +116,9 @@ class MainPage(tk.Tk):
         self.ipaddress=ipaddress
         self.port=port
         self.dpi=dpi
+        self.ipaddresslabel.config(text=self.ipaddress)
+        self.portlabel.config(self.port)
+        self.dpilabel.config(text=self.dpi)
         
     
     def focus_next_widget(self,event):
@@ -126,9 +128,6 @@ class MainPage(tk.Tk):
     
 
     def print_label(self):
-        if not self.comm:
-            tm.showerror("エラー","プリンタ接続を確認して下さい。",parent=self)
-            return
         startnum=self.startnumberinput.get()
         if not startnum or not startnum.isnumeric():
             tm.showerror("エラー","番号が不正な値です",parent=self)
@@ -139,25 +138,36 @@ class MainPage(tk.Tk):
             tm.showerror("エラー","プリンタが未設定です")
             return
         label_width=int(90*self.dpi/25.4)
-    
+
+        comm= SG412R_Status5()
         
         try:
-            with self.comm.open(self.ipaddress, self.port):
+            with comm.open(self.ipaddress, self.port):
+                reset_command = b'^XA^MMT^XZ' 
+                comm.send(reset_command) 
                 gen=LabelGenerator()
+                comm.send(b'^XA') 
                 with gen.packet_for_with():
                     num_str=f"{int(startnum):03}"
-                    print(num_str)
+                    next_num_str=f"{int(startnum)+1:03}"
                     with gen.page_for_with():
                         gen.expansion((2, 2))
                         gen.pos((10,10))
                         gen.code_39(text=num_str,pitch=2,height=100)
                         gen.pos((10,130))
                         gen.write_text(num_str)
-                        gen.print()
-            self.comm.send(gen.to_bytes())
-            cut_command = b'^XA^MMC^XZ'  # カットコマンド
-            self.comm.send(cut_command)
-        
+
+                        gen.pos((460,10))
+                        gen.code_39(text=next_num_str,pitch=2,height=100)
+                        gen.pos((460,130))
+                        gen.write_text(next_num_str)
+                        gen.print(num=1)
+                    comm.send(gen.to_bytes())
+                    comm.send(b'^XZ')
+                    cut_command = b'^XA^MMC^XZ'  # カットコマンド
+                    comm.send(cut_command)
+                    
+                
         
             # 最終化パケットの送信
             print("処理完了")
@@ -166,7 +176,10 @@ class MainPage(tk.Tk):
         except Exception as e:
             print("エラー:", e)
 
-    print("完了")
+        finally:
+            comm.close()
+            print("完了")
+
         
         
         
