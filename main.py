@@ -1,3 +1,4 @@
+import socket
 import time
 from sbpl import SG412R_Status5, LabelGenerator
 import tkinter as tk
@@ -138,46 +139,109 @@ class MainPage(tk.Tk):
         
         
         if not self.ipaddress or not self.port or not self.dpi:
-            tm.showerror("エラー","プリンタが未設定です")
+            tm.showerror("エラー","プリンタが未設定です",parent=self)
             return
-        label_width=int(90*self.dpi/25.4)
+    
 
-        comm= SG412R_Status5()
+        commandlist=[]
         
         try:
-            with comm.open(self.ipaddress, self.port):
-                time.sleep(1)
-                reset_command = b'^XA^MMT^XZ' 
-                comm.send(reset_command) 
-                comm.send(b'^HS')
-                res=comm._client.recv(1024)
-                print(res)
-                gen=LabelGenerator()
-                comm.send(b'^XA') 
-                with gen.packet_for_with():
-                    num_str=f"{int(startnum):03}"
-                    next_num_str=f"{int(startnum)+1:03}"
-                    with gen.page_for_with():
-                        gen.expansion((2, 2))
-                        gen.pos((10,10))
-                        gen.code_39(text=num_str,pitch=2,height=100)
-                        gen.pos((10,130))
-                        gen.write_text(num_str)
-
-                        gen.pos((460,10))
-                        gen.code_39(text=next_num_str,pitch=2,height=100)
-                        gen.pos((460,130))
-                        gen.write_text(next_num_str)
-                        gen.print(num=1)
-                    data=gen.to_bytes()
-                    print(data,"data")
-                    comm.send(data)
-                    comm.send(b'^XZ')
-                    cut_command = b'^XA^MMC^XZ'  # カットコマンド
-                    comm.send(cut_command)
-                    reset_command = b'^XA^MMT^XZ' 
-                    comm.send(reset_command) 
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.connect((self.ipaddress,self.port))
                 
+
+                s.send(b'\x12\x50\x47')
+                # プリンターからの応答を受け取る（最大1024バイト）
+                response = s.recv(1024)
+
+                # 受け取ったデータを表示
+                data = response[1:-1]
+                parts = data.decode('utf-8').split(',')
+                for i in parts:
+                    print(i)
+                status=parts[1]
+                print("status",status)
+                
+                if status!="PS0":
+                    tm.showerror("エラー","プリンタとの接続が確立できません。")
+                    return
+
+
+
+
+                #開始コマンド
+                escape_code = 0x1B
+                ascii_code = ord('佐')
+                print(ascii_code)
+                
+                commandlist.append(b'\x1B\x41')
+
+                command=b''
+
+                #横指定
+                command+=b'\x1B\x48'+str(50).encode()
+
+                
+
+                #縦指定
+                command+=b'\x1B\x56'+str(10).encode()
+
+                #文字
+                # command+=(b'\x1B\x4C0202\x1B\x5001'+b'\x1B\x42\x44003120001')
+
+                
+
+                commandlist.append(command)
+
+                sen=b''
+
+                text = "(株式会社"
+                for i in text:
+                    if ord(i)<=256:
+                        sen+=bytes([ord(i)])
+                    else:
+                        sen+=bytes(i.encode("shift-jis").hex().upper(),"shift-jis")
+
+
+                print(sen)
+
+                #sen=b'81698A94816A83548367815B'
+
+                commandlist.append((b'\x1B\x4B\x32H'+sen))
+                
+                #終了コマンド
+                commandlist.append(b'\x1B\x5A')
+
+                new_command=b'\n'.join(commandlist)
+
+                print(commandlist)
+                print(new_command)
+
+                
+
+
+                s.send(new_command)
+
+                
+                
+                # command=b'''
+                #     \x1B\x41\n
+                #     \x1B\x4850\x1B\x5650\x1B\x4C0202\x1B\x58\x53AAAA\n
+                #     \x1B\x5A
+                # '''
+                
+
+                # command=b'''
+                # \x1B\x41\n
+                # \x1B\x4850\x1B\x5650\x1B\x4C\x01\x01\x1B\x58\x4DABCDEFG\n
+                # \x1B\x5A
+                # '''
+
+                # print(command)
+
+                # s.send(command)
+
+               
         
             # 最終化パケットの送信
             print("処理完了")
